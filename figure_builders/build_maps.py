@@ -1,0 +1,447 @@
+#!/usr/bin/env python3
+"""Build all global map figures with unified style and supervisor edits.
+
+Maps produced:
+- Fig 3.4 — global mask (Valid / Desert / NA)
+- Fig 3.5 — global natural discharge (HydroBASINS Level 6)
+- Fig 3.7 — predicted abundance + top-10 hotspots
+- Fig 3.8 — predicted annual load + top-10 hotspots
+- Fig 3.13 — six-config CoV uncertainty map
+- Fig 4.4 — Step-1 filter outcome map
+- Fig 4.6 — calculated / imputed / NA per MARINA sub-basin
+- Fig 4.8 — global MP_inside (SUPERVISOR FIX: colorbar 'Genload' → 'MP_inside')
+- Fig 4.9 — global MP_out (SUPERVISOR FIX: colorbar 'Outload' → 'MP_out')
+- Fig 4.14 — 3-panel R_MARINA / R_new / ΔR (SUPERVISOR FIX: panel-b drop "Calculated")
+"""
+import sys
+sys.path.insert(0, "/tmp")
+from pathlib import Path
+import warnings
+warnings.filterwarnings("ignore")
+
+import numpy as np
+import pandas as pd
+import geopandas as gpd
+import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
+from matplotlib.colors import LogNorm, BoundaryNorm
+from matplotlib.patches import Patch
+import matplotlib.patches as mpatches
+
+import thesis_style as ts
+ts.apply_style()
+
+# Inputs
+LEV6_SHP = Path("/Users/a1-6/Desktop/Thesis_Organized/03_Code_Final/Chapter_3/3.3.1 reult/data/BasinATLAS_v10_lev06.shp")
+LEV6_STATS = Path("/Users/a1-6/Desktop/Thesis_Organized/03_Code_Final/Chapter_3/02_Training/03_Global_Results_Refined/Global_Stats_Lev6.csv")
+LEV6_AGREE = Path("/Users/a1-6/Desktop/Thesis_Organized/03_Code_Final/Chapter_3/04_Model_Comparison/Global_Results_Agreement_Levels.csv")
+LEV6_LOAD = Path("/Users/a1-6/Desktop/Thesis_Organized/03_Code_Final/Chapter_3/3.3.1 reult/data/Global_Load_Lev6.csv")
+TOP10_ABUND = Path("/Users/a1-6/Desktop/Thesis_Organized/03_Code_Final/Chapter_3/05_Top10_Basin_Analysis/Top10_Subbasins_Detailed.csv")
+MARINA_SHP = Path("/Users/a1-6/Desktop/Thesis_Organized/03_Code_Final/Chapter_4/Active_V6_Pipeline/04_Final_Outputs/Final_Deliverables/Shapefile_Retention_Clear.shp")
+MARINA_XLSX = Path("/Users/a1-6/Desktop/Thesis_Organized/03_Code_Final/Chapter_4/V7_Comparison_Analysis/outputs/Chapter_4_Summary.xlsx")
+
+CH3_OUT = [Path("/Users/a1-6/Desktop/MASTER THESIS/Figures/Chapter 3"),
+           Path("/Users/a1-6/Desktop/Thesis_Organized/02_Figures_Final/Chapter_3")]
+CH4_OUT = [Path("/Users/a1-6/Desktop/MASTER THESIS/Figures/Chapter 4"),
+           Path("/Users/a1-6/Desktop/Thesis_Organized/02_Figures_Final/Chapter_4")]
+
+def save(fig, fname, dirs):
+    for d in dirs:
+        d.mkdir(parents=True, exist_ok=True)
+        fig.savefig(d / fname, dpi=200, bbox_inches="tight")
+    print(f"  Saved {fname}")
+    plt.close(fig)
+
+
+def base_world(ax, gdf):
+    """Add light grey land background outline (just plot all polygons)."""
+    gdf.plot(ax=ax, color="#F0F0F0", edgecolor="#D0D0D0", linewidth=0.1, alpha=0.7, aspect=None)
+
+
+def map_axes(figsize=(14, 7)):
+    fig, ax = plt.subplots(figsize=figsize)
+    ax.set_xlim(-180, 180)
+    ax.set_ylim(-60, 80)
+    ax.set_aspect(1.0)
+    ax.set_xticks([-180, -120, -60, 0, 60, 120, 180])
+    ax.set_yticks([-60, -30, 0, 30, 60])
+    ax.set_xlabel("Longitude (°)", fontsize=10)
+    ax.set_ylabel("Latitude (°)", fontsize=10)
+    return fig, ax
+
+
+# ============================================================
+# Load Lev6 base + stats
+# ============================================================
+print("Loading HydroBASINS Level 6 ...")
+lev6 = gpd.read_file(LEV6_SHP)[["HYBAS_ID", "PFAF_ID", "SUB_AREA", "dis_m3_pyr", "geometry"]]
+print(f"  L6: {len(lev6):,} rows")
+
+stats = pd.read_csv(LEV6_STATS)
+agree = pd.read_csv(LEV6_AGREE)
+print(f"  stats: {len(stats):,}, agreement: {len(agree):,}")
+
+# Merge
+lev6_m = lev6.merge(stats[["Lev6_ID", "Mean_Linear_Conc", "Mean_Log_Conc", "Anomaly_Linear"]],
+                    left_on="PFAF_ID", right_on="Lev6_ID", how="left")
+lev6_m = lev6_m.merge(agree[["Lev6_ID", "CoV"]], on="Lev6_ID", how="left")
+print(f"  merged: {len(lev6_m):,}")
+
+
+# ============================================================
+# Figure 3.4 — global mask (Valid / Desert / NA)
+# ============================================================
+print("\n=== Figure 3.4 — global mask ===")
+def classify(row):
+    if pd.notna(row["Mean_Linear_Conc"]):
+        return "Valid"
+    return "Not Available"
+
+lev6_m["mask_class"] = lev6_m.apply(classify, axis=1)
+
+fig, ax = map_axes(figsize=(14, 7))
+colors_map = {"Valid": "#2C9F2C", "Not Available": "#A0A0A0"}
+for cls, c in colors_map.items():
+    sub = lev6_m[lev6_m["mask_class"] == cls]
+    sub.plot(ax=ax, color=c, edgecolor="none", linewidth=0, aspect=None)
+
+ax.set_xlim(-180, 180)
+ax.set_ylim(-60, 80)
+ax.set_aspect("equal")
+
+handles = [Patch(color=c, label=cls) for cls, c in colors_map.items()]
+ax.legend(handles=handles, loc="lower left", fontsize=10, frameon=True, facecolor="white", edgecolor="#404040")
+ax.set_title("Spatial coverage of the global microplastic-abundance modelling framework",
+             fontweight="bold", pad=8)
+save(fig, "Figure_3_4.png", CH3_OUT)
+
+
+# ============================================================
+# Figure 3.5 — natural discharge
+# ============================================================
+print("\n=== Figure 3.5 — natural discharge ===")
+fig, ax = map_axes(figsize=(14, 7))
+disc = lev6_m.copy()
+disc["log_dis"] = np.log10(disc["dis_m3_pyr"].clip(lower=1e-6) + 1)
+disc.plot(ax=ax, column="log_dis", cmap="Blues", edgecolor="none",
+          legend=True, legend_kwds={"label": "log₁₀(natural discharge, m³ s⁻¹, aspect=None)",
+                                     "shrink": 0.6, "pad": 0.02})
+ax.set_xlim(-180, 180); ax.set_ylim(-60, 80); ax.set_aspect("equal")
+ax.set_title("Global natural river discharge at HydroBASINS Level 6",
+             fontweight="bold", pad=8)
+save(fig, "Figure_3_5.png", CH3_OUT)
+
+
+# ============================================================
+# Figure 3.7 — predicted abundance + top-10 hotspots
+# ============================================================
+print("\n=== Figure 3.7 — predicted abundance ===")
+top10 = pd.read_csv(TOP10_ABUND) if TOP10_ABUND.exists() else None
+
+fig, ax = map_axes(figsize=(14, 7))
+
+# Mask of valid sub-basins
+valid = lev6_m[lev6_m["Mean_Linear_Conc"].notna()].copy()
+nodata = lev6_m[lev6_m["Mean_Linear_Conc"].isna()]
+nodata.plot(ax=ax, color="#E0E0E0", edgecolor="none", aspect=None)
+
+# Plot abundance with YlOrRd
+valid["log_abund"] = np.log10(valid["Mean_Linear_Conc"] + 1)
+vmax = np.percentile(valid["log_abund"], 99.5)
+vmin = 0
+valid.plot(ax=ax, column="log_abund", cmap="YlOrRd", vmin=vmin, vmax=vmax,
+           edgecolor="none",
+           legend=True, legend_kwds={"label": "log₁₀(Predicted abundance + 1, aspect=None) [items m⁻³]",
+                                      "shrink": 0.6, "pad": 0.02})
+
+# Top-10 markers
+if top10 is not None and len(top10) > 0:
+    print("  top10 cols:", list(top10.columns)[:8])
+    # Assume there are lat/lon cols. Map them on
+    lat_col = next((c for c in top10.columns if c.lower() in ("lat", "latitude", "centroid_lat", "y")), None)
+    lon_col = next((c for c in top10.columns if c.lower() in ("lon", "longitude", "centroid_lon", "x")), None)
+    if lat_col and lon_col:
+        for i, row in top10.head(10).iterrows():
+            lat = row[lat_col]; lon = row[lon_col]
+            sz = 200 - i*15
+            ax.scatter([lon], [lat], facecolor="none", edgecolor="#D7191C", s=sz, lw=2.0, zorder=5)
+            ax.text(lon, lat + 1.2, str(i+1), color="#D7191C", ha="center", va="bottom",
+                    fontsize=10, fontweight="bold", zorder=6,
+                    path_effects=None)
+
+ax.set_xlim(-180, 180); ax.set_ylim(-60, 80); ax.set_aspect("equal")
+ax.set_title("Predicted global microplastic abundance with top-10 hotspots",
+             fontweight="bold", pad=8)
+save(fig, "Figure_3_7.png", CH3_OUT)
+
+
+# ============================================================
+# Figure 3.8 — predicted annual load + top-10 hotspots
+# ============================================================
+print("\n=== Figure 3.8 — predicted annual load ===")
+# Compute annual load = abundance × discharge × seconds_per_year
+SECS_PER_YEAR = 31_557_600
+valid["annual_load"] = valid["Mean_Linear_Conc"] * valid["dis_m3_pyr"] * SECS_PER_YEAR
+valid["log_load"] = np.log10(valid["annual_load"].clip(lower=1) + 1)
+
+fig, ax = map_axes(figsize=(14, 7))
+nodata.plot(ax=ax, color="#E0E0E0", edgecolor="none", aspect=None)
+
+vmax = np.percentile(valid["log_load"].dropna(), 99.5)
+valid.plot(ax=ax, column="log_load", cmap="YlOrRd", vmin=0, vmax=vmax, edgecolor="none",
+           legend=True, legend_kwds={"label": "log₁₀(Predicted annual load + 1, aspect=None) [items y⁻¹]",
+                                      "shrink": 0.6, "pad": 0.02})
+
+# Top-10 by annual load
+top10_load = valid.nlargest(10, "annual_load").copy()
+top10_load["lon"] = top10_load.geometry.centroid.x
+top10_load["lat"] = top10_load.geometry.centroid.y
+
+for i, (_, row) in enumerate(top10_load.iterrows()):
+    sz = 220 - i*15
+    ax.scatter([row["lon"]], [row["lat"]], facecolor="none", edgecolor="#D7191C", s=sz, lw=2.0, zorder=5)
+    ax.text(row["lon"], row["lat"] + 1.2, str(i+1), color="#D7191C", ha="center", va="bottom",
+            fontsize=10, fontweight="bold", zorder=6)
+
+ax.set_xlim(-180, 180); ax.set_ylim(-60, 80); ax.set_aspect("equal")
+ax.set_title("Predicted global annual microplastic load with top-10 hotspots",
+             fontweight="bold", pad=8)
+save(fig, "Figure_3_8.png", CH3_OUT)
+
+
+# ============================================================
+# Figure 3.13 — six-config CoV uncertainty map
+# ============================================================
+print("\n=== Figure 3.13 — CoV uncertainty ===")
+fig, ax = map_axes(figsize=(14, 7))
+
+def cov_bin(c):
+    if pd.isna(c): return "NA"
+    if c < 0.5: return "Low (0–0.5)"
+    if c < 1.0: return "Relatively low (0.5–1.0)"
+    if c < 1.5: return "Medium (1.0–1.5)"
+    return "High (>1.5)"
+
+lev6_m["cov_class"] = lev6_m["CoV"].apply(cov_bin)
+cov_cmap = {"Low (0–0.5)": "#1A9850", "Relatively low (0.5–1.0)": "#A6DBA0",
+            "Medium (1.0–1.5)": "#FEE08B", "High (>1.5)": "#D7191C", "NA": "#E0E0E0"}
+
+# Plot each class with its colour
+for cls, c in cov_cmap.items():
+    sub = lev6_m[lev6_m["cov_class"] == cls]
+    if len(sub) > 0:
+        sub.plot(ax=ax, color=c, edgecolor="none", aspect=None)
+
+ax.set_xlim(-180, 180); ax.set_ylim(-60, 80); ax.set_aspect("equal")
+handles = [Patch(color=c, label=cls) for cls, c in cov_cmap.items()]
+ax.legend(handles=handles, loc="lower left", fontsize=9, frameon=True, facecolor="white", edgecolor="#404040")
+ax.set_title("Per-sub-basin Coefficient of Variation (CoV) across six model configurations",
+             fontweight="bold", pad=8)
+save(fig, "Figure_3_13.png", CH3_OUT)
+
+
+# ============================================================
+# Now Ch4 maps — load MARINA shapefile and Chapter_4_Summary
+# ============================================================
+print("\n\n=== Loading MARINA sub-basins ===")
+marina = gpd.read_file(MARINA_SHP)
+print(f"  MARINA: {len(marina):,} rows")
+
+ch4 = pd.read_excel(MARINA_XLSX, sheet_name="per_basin")
+print(f"  per_basin: {len(ch4):,} rows")
+
+marina = marina.drop(columns=[c for c in ["method","gen_flux","out_flux","ar_sqkm","grd_cells"] if c in marina.columns])
+marina_m = marina.merge(ch4, left_on="subbasn", right_on="basin_id", how="left")
+print(f"  merged: {len(marina_m):,}, R_MARINA non-na: {marina_m['R_MARINA'].notna().sum():,}, R_new non-na: {marina_m['R_new'].notna().sum():,}")
+
+
+# ============================================================
+# Figure 4.4 — Step-1 filter outcome
+# ============================================================
+print("\n=== Figure 4.4 — Step-1 filter outcome ===")
+def filter_class(row):
+    if row["is_masked"]: return "Not to sea"
+    if pd.isna(row["R_new"]): return "Greenland"
+    if row["method"] == "Calculated": return "Valid"
+    return "Lack data or single grid"
+
+marina_m["filter_class"] = marina_m.apply(filter_class, axis=1)
+print(marina_m["filter_class"].value_counts())
+
+fig, ax = map_axes(figsize=(14, 7))
+fc_colors = {"Valid": "#2C9F2C", "Lack data or single grid": "#FB9A29",
+             "Not to sea": "#9F76C9", "Greenland": "#A0A0A0"}
+for cls, c in fc_colors.items():
+    sub = marina_m[marina_m["filter_class"] == cls]
+    if len(sub) > 0:
+        sub.plot(ax=ax, color=c, edgecolor="none", aspect=None)
+
+ax.set_xlim(-180, 180); ax.set_ylim(-60, 80); ax.set_aspect("equal")
+handles = [Patch(color=c, label=cls) for cls, c in fc_colors.items()]
+ax.legend(handles=handles, loc="lower left", fontsize=10, frameon=True, facecolor="white", edgecolor="#404040")
+ax.set_title("Global outcome of the two Step-1 data-quality filters across 10,226 MARINA sub-basins",
+             fontweight="bold", pad=8)
+save(fig, "Figure_4_4.png", CH4_OUT)
+
+
+# ============================================================
+# Figure 4.6 — calculated / imputed / NA
+# ============================================================
+print("\n=== Figure 4.6 — calculated / imputed / NA ===")
+def method_class(row):
+    if row["is_masked"]: return "Not Available"
+    if pd.isna(row["R_new"]): return "Not Available"
+    if row["method"] == "Calculated": return "Calculated"
+    return "Imputed"
+
+marina_m["m_class"] = marina_m.apply(method_class, axis=1)
+print(marina_m["m_class"].value_counts())
+
+fig, axes = plt.subplots(1, 2, figsize=(15.5, 6.5), gridspec_kw={"width_ratios": [3, 1]})
+
+ax = axes[0]
+mc = {"Calculated": "#1F78B4", "Imputed": "#FB9A29", "Not Available": "#A0A0A0"}
+for cls, c in mc.items():
+    sub = marina_m[marina_m["m_class"] == cls]
+    if len(sub) > 0:
+        sub.plot(ax=ax, color=c, edgecolor="none", aspect=None)
+
+ax.set_xlim(-180, 180); ax.set_ylim(-60, 80); ax.set_aspect("equal")
+ax.set_xlabel("Longitude (°)"); ax.set_ylabel("Latitude (°)")
+handles = [Patch(color=c, label=cls) for cls, c in mc.items()]
+ax.legend(handles=handles, loc="lower left", fontsize=10, frameon=True, facecolor="white", edgecolor="#404040")
+ax.set_title("(a) Map of method per MARINA sub-basin", fontweight="bold")
+
+# Right pie/bar: by area
+ax2 = axes[1]
+counts = marina_m.groupby("m_class")["ar_sqkm"].sum() / marina_m["ar_sqkm"].sum() * 100
+counts = counts.reindex(["Calculated", "Imputed", "Not Available"], fill_value=0)
+n_counts = marina_m["m_class"].value_counts().reindex(["Calculated", "Imputed", "Not Available"], fill_value=0)
+ax2.barh(np.arange(3), counts.values, color=[mc[k] for k in counts.index], edgecolor="#252525", lw=0.8)
+for i, (lab, pct, n) in enumerate(zip(counts.index, counts.values, n_counts.values)):
+    ax2.text(pct + 1, i, f"{pct:.0f}% (n = {n:,})", va="center", fontsize=9)
+ax2.set_yticks(np.arange(3))
+ax2.set_yticklabels(counts.index)
+ax2.set_xlabel("Share of total sub-basin area (%)")
+ax2.set_xlim(0, 100)
+ax2.set_title("(b) Area share", fontweight="bold")
+ax2.invert_yaxis()
+
+plt.tight_layout()
+save(fig, "Figure_4_6.png", CH4_OUT)
+
+
+# ============================================================
+# Figure 4.8 — global MP_inside (SUPERVISOR FIX colorbar)
+# ============================================================
+print("\n=== Figure 4.8 — MP_inside ===")
+fig, ax = map_axes(figsize=(14, 7))
+
+vp = marina_m.copy()
+vp["log_gen"] = np.log10(vp["gen_flux"].clip(lower=0) + 1)
+
+# Mask NA
+na = vp[vp["gen_flux"].isna()]
+na.plot(ax=ax, color="#E0E0E0", edgecolor="none", aspect=None)
+
+valid_v = vp[vp["gen_flux"].notna()]
+vmax = np.percentile(valid_v["log_gen"], 99.5)
+valid_v.plot(ax=ax, column="log_gen", cmap="YlOrRd", vmin=0, vmax=vmax,
+             edgecolor="none",
+             # SUPERVISOR FIX: colorbar label uses MP_inside
+             legend=True, legend_kwds={"label": "log₁₀($MP_{inside}$ + 1, aspect=None) [items y⁻¹]",
+                                        "shrink": 0.6, "pad": 0.02})
+
+ax.set_xlim(-180, 180); ax.set_ylim(-60, 80); ax.set_aspect("equal")
+ax.set_title("Global distribution of $MP_{inside}$ across 10,226 MARINA sub-basins",
+             fontweight="bold", pad=8)
+save(fig, "Figure_4_8.png", CH4_OUT)
+
+
+# ============================================================
+# Figure 4.9 — global MP_out (SUPERVISOR FIX colorbar) — outlets as points
+# ============================================================
+print("\n=== Figure 4.9 — MP_out ===")
+fig, ax = map_axes(figsize=(14, 7))
+
+# Plot land background
+marina_m.plot(ax=ax, color="#F4F4F4", edgecolor="none", aspect=None)
+
+# Plot outlets as points coloured by log MP_out
+out_pts = marina_m.copy()
+out_pts["log_out"] = np.log10(out_pts["out_flux"].clip(lower=0) + 1)
+out_pts["lon"] = out_pts.geometry.centroid.x
+out_pts["lat"] = out_pts.geometry.centroid.y
+v_pts = out_pts[out_pts["out_flux"].notna() & out_pts["out_flux"].gt(0)]
+vmax = np.percentile(v_pts["log_out"], 99.5)
+
+sc = ax.scatter(v_pts["lon"], v_pts["lat"], c=v_pts["log_out"], cmap="YlOrRd",
+                s=np.clip(v_pts["log_out"] * 6, 2, 60), vmin=0, vmax=vmax,
+                edgecolors="none", alpha=0.9)
+cbar = plt.colorbar(sc, ax=ax, shrink=0.6, pad=0.02)
+# SUPERVISOR FIX: colorbar label uses MP_out
+cbar.set_label("log₁₀($MP_{out}$ + 1) [items y⁻¹]", fontweight="bold")
+
+ax.set_xlim(-180, 180); ax.set_ylim(-60, 80); ax.set_aspect("equal")
+ax.set_title("Global distribution of $MP_{out}$ at MARINA sub-basin outlets",
+             fontweight="bold", pad=8)
+save(fig, "Figure_4_9.png", CH4_OUT)
+
+
+# ============================================================
+# Figure 4.14 — three-panel R_MARINA / R_new / ΔR  (SUPERVISOR FIX panel-b)
+# ============================================================
+print("\n=== Figure 4.14 — three-panel retention ===")
+fig, axes = plt.subplots(3, 1, figsize=(14, 14))
+
+# Panel a — R_MARINA
+ax = axes[0]
+mp = marina_m.copy()
+ax.set_aspect("equal")
+ax.set_xlim(-180, 180); ax.set_ylim(-60, 80)
+ax.set_xlabel("Longitude (°)"); ax.set_ylabel("Latitude (°)")
+boundaries = [0.85, 0.88, 0.91, 0.94, 0.97, 1.00]
+cmap = plt.cm.YlOrBr
+norm = BoundaryNorm(boundaries, cmap.N)
+mp.plot(ax=ax, column="R_MARINA", cmap=cmap, norm=norm, edgecolor="none",
+        missing_kwds={"color": "#E0E0E0"}, aspect=None)
+sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+cbar = plt.colorbar(sm, ax=ax, shrink=0.6, pad=0.02, ticks=boundaries)
+cbar.set_label("$R_{MARINA}$ = 1 − $FE_{riv,o}$", fontweight="bold")
+ax.set_title("(a) MARINA-Multi baseline retention rate $R_{MARINA}$",
+             fontweight="bold", loc="left")
+
+# Panel b — R_new (SUPERVISOR FIX: drop "(Calculated)")
+ax = axes[1]
+ax.set_aspect("equal")
+ax.set_xlim(-180, 180); ax.set_ylim(-60, 80)
+ax.set_xlabel("Longitude (°)"); ax.set_ylabel("Latitude (°)")
+mp.plot(ax=ax, column="R_new", cmap=cmap, norm=norm, edgecolor="none",
+        missing_kwds={"color": "#E0E0E0"}, aspect=None)
+sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+cbar = plt.colorbar(sm, ax=ax, shrink=0.6, pad=0.02, ticks=boundaries)
+# SUPERVISOR FIX: drop "(Calculated)" — just use the symbolic equation in MP_inside / MP_out
+cbar.set_label("$R_{new,j}$ = 1 − $MP_{out}$ / $MP_{inside}$", fontweight="bold")
+ax.set_title("(b) New retention rate of this chapter $R_{new}$",
+             fontweight="bold", loc="left")
+
+# Panel c — ΔR (diverging map)
+ax = axes[2]
+ax.set_aspect("equal")
+ax.set_xlim(-180, 180); ax.set_ylim(-60, 80)
+ax.set_xlabel("Longitude (°)"); ax.set_ylabel("Latitude (°)")
+dr_boundaries = [-0.30, -0.20, -0.10, -0.02, 0.02, 0.10, 0.20, 0.30]
+dr_cmap = plt.cm.RdBu_r
+dr_norm = BoundaryNorm(dr_boundaries, dr_cmap.N)
+mp.plot(ax=ax, column="delta_R", cmap=dr_cmap, norm=dr_norm, edgecolor="none",
+        missing_kwds={"color": "#E0E0E0"}, aspect=None)
+sm = plt.cm.ScalarMappable(cmap=dr_cmap, norm=dr_norm)
+cbar = plt.colorbar(sm, ax=ax, shrink=0.6, pad=0.02, ticks=dr_boundaries)
+cbar.set_label("$\\Delta R$ = $R_{new}$ − $R_{MARINA}$", fontweight="bold")
+ax.set_title("(c) Per-MARINA-sub-basin retention difference $\\Delta R$",
+             fontweight="bold", loc="left")
+
+plt.tight_layout()
+save(fig, "Figure_4_14.png", CH4_OUT)
+
+print("\nAll maps regenerated.")
