@@ -1,0 +1,8 @@
+# Core dependencies for stages 1 and 3.
+# Stage 2 (ASReview) is run interactively; install separately per https://asreview.readthedocs.io/
+
+pandas>=2.0
+openpyxl>=3.1            # for .xlsx I/O in pandas
+google-generativeai>=0.8 # Gemini API client used in 03_llm_full_text_screening/llm_screen.py
+PyPDF2>=3.0              # local PDF preprocessing
+tqdm>=4.66

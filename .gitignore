@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env
+.python-version
+
+# Editor
+.vscode/
+.idea/
+.DS_Store
+
+# Data files (do not commit large PDFs or full-text downloads)
+*.pdf
+**/full_text_pdfs/
+**/raw_data/*.xlsx
+**/raw_data/*.csv
+
+# API keys
+GEMINI_API_KEY*
+*.key
+*.pem
