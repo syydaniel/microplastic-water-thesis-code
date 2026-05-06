@@ -1,4 +1,0 @@
-doi,title,decision,reason,pdf_path
-10.1016/j.example.2024.000001,Example primary study reporting microplastic abundance in a temperate river,INCLUDE,Reports surface-water MP abundance in items L⁻¹ from non-tidal river reaches.,
-10.1016/j.example.2024.000002,Example study sampling sediment only,EXCLUDE,The paper reports microplastic abundance only in sediment samples (items kg⁻¹) and contains no surface-water column data.,
-10.1016/j.example.2024.000003,Example study at the river–estuary transition,UNCERTAIN,The sampling stations span both freshwater and brackish reaches; only one station is clearly above the salt wedge.,

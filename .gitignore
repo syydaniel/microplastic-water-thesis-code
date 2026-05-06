@@ -11,14 +11,24 @@ venv/
 .vscode/
 .idea/
 .DS_Store
+*.code-workspace
 
-# Data files (do not commit large PDFs or full-text downloads)
-*.pdf
-**/full_text_pdfs/
-**/raw_data/*.xlsx
-**/raw_data/*.csv
-
-# API keys
+# API keys and secrets
 GEMINI_API_KEY*
 *.key
 *.pem
+.env.local
+
+# Large intermediate files (regenerated locally; not redistributed)
+**/Global_Predictors_Lev12.csv
+**/Global_Results_Lev12_Full.csv
+**/Global_Results_Lev12_Full.xlsx
+**/Sensitivity_Analysis/
+**/shap_values_*_full.csv
+**/optuna*.db
+**/full_text_pdfs/
+**/raw_data/*.xlsx
+*.parquet
+
+# PDFs (full-text papers are not redistributed for copyright reasons)
+*.pdf
