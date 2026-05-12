@@ -10,8 +10,8 @@ Figures produced:
 Inputs: Chapter_4_Summary.xlsx (per_basin sheet, 10,226 rows)
 """
 import sys
-sys.path.insert(0, "/tmp")
 from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import numpy as np
 import pandas as pd
@@ -21,10 +21,11 @@ import matplotlib.patches as mpatches
 import thesis_style as ts
 ts.apply_style()
 
-XLSX = Path("/Users/a1-6/Desktop/Thesis_Organized/03_Code_Final/Chapter_4/V7_Comparison_Analysis/outputs/Chapter_4_Summary.xlsx")
+XLSX = Path("/Users/a1-6/Desktop/01_MSc_Thesis/Thesis_Organized/03_Code_Final/Chapter_4/V7_Comparison_Analysis/outputs/Chapter_4_Summary.xlsx")
 OUT_DIRS = [
-    Path("/Users/a1-6/Desktop/MASTER THESIS/Figures/Chapter 4"),
-    Path("/Users/a1-6/Desktop/Thesis_Organized/02_Figures_Final/Chapter_4"),
+    Path("/Users/a1-6/Desktop/01_MSc_Thesis/MASTER THESIS/Figures/Chapter 4"),
+    Path("/Users/a1-6/Desktop/01_MSc_Thesis/Thesis_Organized/02_Figures_Final/Chapter_4"),
+    Path("/tmp/ch4_canonical_v1"),
 ]
 for d in OUT_DIRS:
     d.mkdir(parents=True, exist_ok=True)
