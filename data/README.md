@@ -6,9 +6,10 @@ The CSV / XLSX files in this directory are the **final outputs and figure-reprod
 
 | File | Rows | Contents |
 |---|---|---|
+| `chapter_2/clean_dataset_n3148.csv` | 3,148 | **The clean dataset.** The 3,148-record integrated table that is the basis for all Chapter 2 analyses and figures, and the input training target for Chapter 3. One row per sampling site. Columns: identifier (`Unique_ID`, `Study_ID`), publication metadata (`Title`, `Year`, `First_Author`), location (`Latitude`, `Longitude`, `Water_Body_Type`), sampling year and month (`Range_Year`, `Range_Month`, `Samp_Year_Start`/`End`, `Samp_Month_Start`/`End`, `Season_Calculated`, `Season_WetDry`), sampling methodology (`Sampling_Gear`, `Gear_Category`, `Mesh_Size_um`, `Sample_Depth`, `Sample_Volume`, `Digestion_Category`, `Separation_Category`), abundance (`Std_Value_m3`, items m⁻³), shape composition % (`Shape_Fiber`, `Shape_Fragment`, `Shape_Pellet`, `Shape_Film`, `Shape_Other`), polymer composition % (`Poly_PE`, `Poly_PP`, `Poly_PS`, `Poly_PET`, `Poly_PVC`, `Poly_PA`, `Poly_PC`, `Poly_PU`, `Poly_PMMA`, `Poly_EPS`, `Poly_XPS`, `Poly_Rayon`, `Poly_CA`, `Poly_Other`), QA flag (`QA_Blank_Corrected`, `N_Replicates`), and free-text `Note`. |
 | `chapter_2/retained_primary_studies_251.csv` | 251 | The full APA reference list of the 251 primary studies retained after QC (Chapter 2 Step 3). Columns: `study_id`, `first_author`, `year`, `title`, `author_full`, `journal`, `volume`, `pages`, `doi`, `apa_citation` (drop-in formatted). |
 | `chapter_2/master_reference_table.csv` | 283 | The master EndNote-derived reference table that feeds the QC step (includes pre-QC entries and full abstracts). |
-| `chapter_2/extracted_records_combined.csv` | 4,736 raw | Extracted-records table from the LLM data-mining stage of Step 2 (before the record-level QC filter that produces the 3,148-record clean dataset). |
+| `chapter_2/extracted_records_combined.csv` | 4,736 raw | Extracted-records table from the LLM data-extraction stage of Section 2.2.2 (before the record-level QC filter that produces `clean_dataset_n3148.csv`). |
 
 ## Chapter 3 — LightGBM training and global predictions
 
