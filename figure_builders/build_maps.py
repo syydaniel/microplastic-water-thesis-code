@@ -14,8 +14,9 @@ Maps produced:
 - Fig 4.14 — 3-panel R_MARINA / R_new / ΔR (SUPERVISOR FIX: panel-b drop "Calculated")
 """
 import sys
-sys.path.insert(0, "/tmp")
 from pathlib import Path
+# Make thesis_style importable from this script's directory regardless of cwd.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -31,19 +32,23 @@ import matplotlib.patches as mpatches
 import thesis_style as ts
 ts.apply_style()
 
-# Inputs
-LEV6_SHP = Path("/Users/a1-6/Desktop/Thesis_Organized/03_Code_Final/Chapter_3/3.3.1 reult/data/BasinATLAS_v10_lev06.shp")
-LEV6_STATS = Path("/Users/a1-6/Desktop/Thesis_Organized/03_Code_Final/Chapter_3/02_Training/03_Global_Results_Refined/Global_Stats_Lev6.csv")
-LEV6_AGREE = Path("/Users/a1-6/Desktop/Thesis_Organized/03_Code_Final/Chapter_3/04_Model_Comparison/Global_Results_Agreement_Levels.csv")
-LEV6_LOAD = Path("/Users/a1-6/Desktop/Thesis_Organized/03_Code_Final/Chapter_3/3.3.1 reult/data/Global_Load_Lev6.csv")
-TOP10_ABUND = Path("/Users/a1-6/Desktop/Thesis_Organized/03_Code_Final/Chapter_3/05_Top10_Basin_Analysis/Top10_Subbasins_Detailed.csv")
-MARINA_SHP = Path("/Users/a1-6/Desktop/Thesis_Organized/03_Code_Final/Chapter_4/Active_V6_Pipeline/04_Final_Outputs/Final_Deliverables/Shapefile_Retention_Clear.shp")
-MARINA_XLSX = Path("/Users/a1-6/Desktop/Thesis_Organized/03_Code_Final/Chapter_4/V7_Comparison_Analysis/outputs/Chapter_4_Summary.xlsx")
+# Inputs (all under 01_MSc_Thesis/Thesis_Organized/)
+LEV6_SHP = Path("/Users/a1-6/Desktop/01_MSc_Thesis/Thesis_Organized/03_Code_Final/Chapter_3/3.3.1 reult/data/BasinATLAS_v10_lev06.shp")
+LEV6_STATS = Path("/Users/a1-6/Desktop/01_MSc_Thesis/Thesis_Organized/03_Code_Final/Chapter_3/02_Training/03_Global_Results_Refined/Global_Stats_Lev6.csv")
+LEV6_AGREE = Path("/Users/a1-6/Desktop/01_MSc_Thesis/Thesis_Organized/03_Code_Final/Chapter_3/04_Model_Comparison/Global_Results_Agreement_Levels.csv")
+LEV6_LOAD = Path("/Users/a1-6/Desktop/01_MSc_Thesis/Thesis_Organized/03_Code_Final/Chapter_3/3.3.1 reult/data/Global_Load_Lev6.csv")
+TOP10_ABUND = Path("/Users/a1-6/Desktop/01_MSc_Thesis/Thesis_Organized/03_Code_Final/Chapter_3/05_Top10_Basin_Analysis/Top10_Subbasins_Detailed.csv")
+MARINA_SHP = Path("/Users/a1-6/Desktop/01_MSc_Thesis/Thesis_Organized/03_Code_Final/Chapter_4/Active_V6_Pipeline/04_Final_Outputs/Final_Deliverables/Shapefile_Retention_Clear.shp")
+MARINA_XLSX = Path("/Users/a1-6/Desktop/01_MSc_Thesis/Thesis_Organized/03_Code_Final/Chapter_4/V7_Comparison_Analysis/outputs/Chapter_4_Summary.xlsx")
 
-CH3_OUT = [Path("/Users/a1-6/Desktop/MASTER THESIS/Figures/Chapter 3"),
-           Path("/Users/a1-6/Desktop/Thesis_Organized/02_Figures_Final/Chapter_3")]
-CH4_OUT = [Path("/Users/a1-6/Desktop/MASTER THESIS/Figures/Chapter 4"),
-           Path("/Users/a1-6/Desktop/Thesis_Organized/02_Figures_Final/Chapter_4")]
+# Outputs: canonical folders + a verification copy in /tmp for the Phase-22 audit.
+# Three writes per figure: MASTER THESIS, Thesis_Organized mirror, and /tmp verification.
+CH3_OUT = [Path("/Users/a1-6/Desktop/01_MSc_Thesis/MASTER THESIS/Figures/Chapter 3"),
+           Path("/Users/a1-6/Desktop/01_MSc_Thesis/Thesis_Organized/02_Figures_Final/Chapter_3"),
+           Path("/tmp/ch4_canonical_v1")]
+CH4_OUT = [Path("/Users/a1-6/Desktop/01_MSc_Thesis/MASTER THESIS/Figures/Chapter 4"),
+           Path("/Users/a1-6/Desktop/01_MSc_Thesis/Thesis_Organized/02_Figures_Final/Chapter_4"),
+           Path("/tmp/ch4_canonical_v1")]
 
 def save(fig, fname, dirs):
     for d in dirs:
@@ -123,8 +128,8 @@ print("\n=== Figure 3.5 — natural discharge ===")
 fig, ax = map_axes(figsize=(14, 7))
 disc = lev6_m.copy()
 disc["log_dis"] = np.log10(disc["dis_m3_pyr"].clip(lower=1e-6) + 1)
-disc.plot(ax=ax, column="log_dis", cmap="Blues", edgecolor="none",
-          legend=True, legend_kwds={"label": "log₁₀(natural discharge, m³ s⁻¹, aspect=None)",
+disc.plot(ax=ax, column="log_dis", cmap="Blues", edgecolor="none", aspect=None,
+          legend=True, legend_kwds={"label": r"$\log_{10}$(natural discharge, m$^3$ s$^{-1}$)",
                                      "shrink": 0.6, "pad": 0.02})
 ax.set_xlim(-180, 180); ax.set_ylim(-60, 80); ax.set_aspect("equal")
 ax.set_title("Global natural river discharge at HydroBASINS Level 6",
@@ -150,8 +155,8 @@ valid["log_abund"] = np.log10(valid["Mean_Linear_Conc"] + 1)
 vmax = np.percentile(valid["log_abund"], 99.5)
 vmin = 0
 valid.plot(ax=ax, column="log_abund", cmap="YlOrRd", vmin=vmin, vmax=vmax,
-           edgecolor="none",
-           legend=True, legend_kwds={"label": "log₁₀(Predicted abundance + 1, aspect=None) [items m⁻³]",
+           edgecolor="none", aspect=None,
+           legend=True, legend_kwds={"label": r"$\log_{10}$(predicted abundance + 1) [items m$^{-3}$]",
                                       "shrink": 0.6, "pad": 0.02})
 
 # Top-10 markers
@@ -188,8 +193,8 @@ fig, ax = map_axes(figsize=(14, 7))
 nodata.plot(ax=ax, color="#E0E0E0", edgecolor="none", aspect=None)
 
 vmax = np.percentile(valid["log_load"].dropna(), 99.5)
-valid.plot(ax=ax, column="log_load", cmap="YlOrRd", vmin=0, vmax=vmax, edgecolor="none",
-           legend=True, legend_kwds={"label": "log₁₀(Predicted annual load + 1, aspect=None) [items y⁻¹]",
+valid.plot(ax=ax, column="log_load", cmap="YlOrRd", vmin=0, vmax=vmax, edgecolor="none", aspect=None,
+           legend=True, legend_kwds={"label": r"$\log_{10}$(predicted annual load + 1) [items y$^{-1}$]",
                                       "shrink": 0.6, "pad": 0.02})
 
 # Top-10 by annual load
@@ -348,8 +353,9 @@ valid_v = vp[vp["gen_flux"].notna()]
 vmax = np.percentile(valid_v["log_gen"], 99.5)
 valid_v.plot(ax=ax, column="log_gen", cmap="YlOrRd", vmin=0, vmax=vmax,
              edgecolor="none",
+             aspect=None,
              # SUPERVISOR FIX: colorbar label uses MP_inside
-             legend=True, legend_kwds={"label": "log₁₀($MP_{inside}$ + 1, aspect=None) [items y⁻¹]",
+             legend=True, legend_kwds={"label": r"$\log_{10}$($MP_{inside}$ + 1) [items y$^{-1}$]",
                                         "shrink": 0.6, "pad": 0.02})
 
 ax.set_xlim(-180, 180); ax.set_ylim(-60, 80); ax.set_aspect("equal")
@@ -380,7 +386,7 @@ sc = ax.scatter(v_pts["lon"], v_pts["lat"], c=v_pts["log_out"], cmap="YlOrRd",
                 edgecolors="none", alpha=0.9)
 cbar = plt.colorbar(sc, ax=ax, shrink=0.6, pad=0.02)
 # SUPERVISOR FIX: colorbar label uses MP_out
-cbar.set_label("log₁₀($MP_{out}$ + 1) [items y⁻¹]", fontweight="bold")
+cbar.set_label(r"$\log_{10}$($MP_{out}$ + 1) [items y$^{-1}$]", fontweight="bold")
 
 ax.set_xlim(-180, 180); ax.set_ylim(-60, 80); ax.set_aspect("equal")
 ax.set_title("Global distribution of $MP_{out}$ at MARINA sub-basin outlets",
