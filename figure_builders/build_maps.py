@@ -133,205 +133,80 @@ save(fig, "Figure_3_5.png", CH3_OUT)
 
 
 # ============================================================
-# Figure 3.7 — predicted abundance + top-10 hotspots (main + 3 zooms)
+# Figure 3.7 — predicted abundance + top-10 hotspots
 # ============================================================
-# Layout (v4, May 2026): each panel is a SEPARATE 4:3 PNG. The main global
-# map (Figure_3_7.png) holds all 10 hotspots; three regional zooms
-# (Figure_3_7a/b/c.png) re-render the same polygon data at the crowded
-# clusters so the rank numbers remain readable. The colour scale and
-# vmin/vmax are identical across all four panels.
 print("\n=== Figure 3.7 — predicted abundance ===")
+top10 = pd.read_csv(TOP10_ABUND) if TOP10_ABUND.exists() else None
 
-VMIN_ABUND, VMAX_ABUND = 0, 7
+fig, ax = map_axes(figsize=(14, 7))
 
+# Mask of valid sub-basins
 valid = lev6_m[lev6_m["Mean_Linear_Conc"].notna()].copy()
 nodata = lev6_m[lev6_m["Mean_Linear_Conc"].isna()]
-valid["log_abund"] = np.log10(valid["Mean_Linear_Conc"] + 1)
-
-top10_abund = (valid.nlargest(10, "Mean_Linear_Conc")
-                    .reset_index(drop=True).copy())
-top10_abund["rank"] = range(1, 11)
-top10_abund["lon"] = top10_abund.geometry.centroid.x
-top10_abund["lat"] = top10_abund.geometry.centroid.y
-
-
-def draw_rank_marker(ax, lon, lat, rank, value_log, vmin, vmax,
-                     offset_pt, marker_size, font_size):
-    """Plot one labelled leader line that ends in an arrowhead at (lon, lat).
-
-    No circle marker. The arrowhead alone identifies the sub-basin centroid;
-    the underlying YlOrRd polygon already shows the abundance / load value.
-    Dropping the circle avoids the layering issue where one rank's leader
-    line overlaps another rank's circle.
-
-    offset_pt is (dx, dy) in pixel-points so leader-line lengths stay
-    consistent across the global map and the regional zooms. The
-    marker_size, value_log, vmin and vmax arguments are accepted for
-    backward-compatible call sites; they are now unused.
-    """
-    _ = marker_size, value_log, vmin, vmax
-    ax.annotate(str(rank), xy=(lon, lat),
-                xytext=offset_pt, textcoords="offset points",
-                fontsize=font_size, fontweight="bold",
-                ha="center", va="center",
-                bbox=dict(boxstyle="round,pad=0.30", fc="white",
-                          ec="black", lw=0.6, alpha=0.95),
-                arrowprops=dict(
-                    arrowstyle="->,head_length=0.45,head_width=0.30",
-                    color="black", lw=1.0, shrinkA=0, shrinkB=0),
-                zorder=10)
-
-
-# Pixel-offset table for the global abundance map. Offsets are chosen so
-# that no two leader lines cross each other.
-MAIN37_OFFSETS = {
-    1:  (-55,  28), 2:  ( 38,  10), 3:  ( 38, -22), 4:  ( 38, -20),
-    5:  (-45,  20), 6:  ( 38, -28), 7:  (-50,  -2), 8:  (  0,  32),
-    9:  (-45,  28), 10: ( 38, -22),
-}
-
-# --- Figure 3.7 main map ---
-fig, ax = plt.subplots(figsize=(8, 6))   # 4:3
 nodata.plot(ax=ax, color="#E0E0E0", edgecolor="none", aspect=None)
-valid.plot(ax=ax, column="log_abund", cmap="YlOrRd",
-           vmin=VMIN_ABUND, vmax=VMAX_ABUND, edgecolor="none",
-           legend=True,
-           legend_kwds={"label": "log₁₀(Predicted abundance + 1) [items m⁻³]",
-                        "shrink": 0.6, "pad": 0.02})
-for _, h in top10_abund.iterrows():
-    r = int(h["rank"])
-    draw_rank_marker(ax, h["lon"], h["lat"], r, h["log_abund"],
-                     VMIN_ABUND, VMAX_ABUND,
-                     offset_pt=MAIN37_OFFSETS[r],
-                     marker_size=max(110, 220 - (r - 1) * 10),
-                     font_size=10)
-ax.set_xlim(-180, 180); ax.set_ylim(-58, 82); ax.set_aspect("equal")
-ax.set_xlabel("Longitude (°)", fontsize=10)
-ax.set_ylabel("Latitude (°)", fontsize=10)
+
+# Plot abundance with YlOrRd
+valid["log_abund"] = np.log10(valid["Mean_Linear_Conc"] + 1)
+vmax = np.percentile(valid["log_abund"], 99.5)
+vmin = 0
+valid.plot(ax=ax, column="log_abund", cmap="YlOrRd", vmin=vmin, vmax=vmax,
+           edgecolor="none",
+           legend=True, legend_kwds={"label": "log₁₀(Predicted abundance + 1, aspect=None) [items m⁻³]",
+                                      "shrink": 0.6, "pad": 0.02})
+
+# Top-10 markers
+if top10 is not None and len(top10) > 0:
+    print("  top10 cols:", list(top10.columns)[:8])
+    # Assume there are lat/lon cols. Map them on
+    lat_col = next((c for c in top10.columns if c.lower() in ("lat", "latitude", "centroid_lat", "y")), None)
+    lon_col = next((c for c in top10.columns if c.lower() in ("lon", "longitude", "centroid_lon", "x")), None)
+    if lat_col and lon_col:
+        for i, row in top10.head(10).iterrows():
+            lat = row[lat_col]; lon = row[lon_col]
+            sz = 200 - i*15
+            ax.scatter([lon], [lat], facecolor="none", edgecolor="#D7191C", s=sz, lw=2.0, zorder=5)
+            ax.text(lon, lat + 1.2, str(i+1), color="#D7191C", ha="center", va="bottom",
+                    fontsize=10, fontweight="bold", zorder=6,
+                    path_effects=None)
+
+ax.set_xlim(-180, 180); ax.set_ylim(-60, 80); ax.set_aspect("equal")
+ax.set_title("Predicted global microplastic abundance with top-10 hotspots",
+             fontweight="bold", pad=8)
 save(fig, "Figure_3_7.png", CH3_OUT)
 
-# --- Figure 3.7 zoom panels ---
-FIG37_ZOOMS = [
-    {"out": "Figure_3_7a.png",
-     "title": "(a) Maharashtra cluster (near Pune)",
-     "extent": (70, 78, 16, 22), "ranks": [1, 6],
-     "label_offsets": {1: (-55,  30), 6: ( 45, -30)}},
-    {"out": "Figure_3_7b.png",
-     "title": "(b) Mississippi cluster (Missouri)",
-     "extent": (-97, -85, 33, 42), "ranks": [3, 7, 8],
-     "label_offsets": {3: ( 45, -30), 7: (-55,  30), 8: ( 45,  30)}},
-    {"out": "Figure_3_7c.png",
-     "title": "(c) Kaduna cluster (Nigeria)",
-     "extent": (4, 12, 8, 14), "ranks": [9, 10],
-     "label_offsets": {9: (-55,  30), 10: ( 45, -30)}},
-]
-for z in FIG37_ZOOMS:
-    lon_min, lon_max, lat_min, lat_max = z["extent"]
-    sub_v = valid.cx[lon_min:lon_max, lat_min:lat_max]
-    sub_n = nodata.cx[lon_min:lon_max, lat_min:lat_max]
-    fig, ax = plt.subplots(figsize=(8, 6))
-    if not sub_n.empty:
-        sub_n.plot(ax=ax, color="#E0E0E0", edgecolor="none", aspect=None)
-    sub_v.plot(ax=ax, column="log_abund", cmap="YlOrRd",
-               vmin=VMIN_ABUND, vmax=VMAX_ABUND, edgecolor="none",
-               legend=True,
-               legend_kwds={"label": "log₁₀(Abundance + 1) [items m⁻³]",
-                            "shrink": 0.7, "pad": 0.02})
-    for r in z["ranks"]:
-        h = top10_abund[top10_abund["rank"] == r].iloc[0]
-        draw_rank_marker(ax, h["lon"], h["lat"], r, h["log_abund"],
-                         VMIN_ABUND, VMAX_ABUND,
-                         offset_pt=z["label_offsets"][r],
-                         marker_size=max(160, 320 - (r - 1) * 18),
-                         font_size=13)
-    ax.set_xlim(lon_min, lon_max); ax.set_ylim(lat_min, lat_max)
-    ax.set_aspect("equal")
-    ax.set_xlabel("Longitude (°)", fontsize=10)
-    ax.set_ylabel("Latitude (°)", fontsize=10)
-    ax.set_title(z["title"], fontweight="bold", pad=10)
-    save(fig, z["out"], CH3_OUT)
-
 
 # ============================================================
-# Figure 3.8 — predicted annual load + top-10 hotspots (main + 2 zooms)
+# Figure 3.8 — predicted annual load + top-10 hotspots
 # ============================================================
 print("\n=== Figure 3.8 — predicted annual load ===")
-
-VMIN_LOAD, VMAX_LOAD = 0, 11
+# Compute annual load = abundance × discharge × seconds_per_year
 SECS_PER_YEAR = 31_557_600
-valid["annual_load"] = (valid["Mean_Linear_Conc"]
-                        * valid["dis_m3_pyr"] * SECS_PER_YEAR)
+valid["annual_load"] = valid["Mean_Linear_Conc"] * valid["dis_m3_pyr"] * SECS_PER_YEAR
 valid["log_load"] = np.log10(valid["annual_load"].clip(lower=1) + 1)
 
-top10_load = (valid.nlargest(10, "annual_load")
-                   .reset_index(drop=True).copy())
-top10_load["rank"] = range(1, 11)
+fig, ax = map_axes(figsize=(14, 7))
+nodata.plot(ax=ax, color="#E0E0E0", edgecolor="none", aspect=None)
+
+vmax = np.percentile(valid["log_load"].dropna(), 99.5)
+valid.plot(ax=ax, column="log_load", cmap="YlOrRd", vmin=0, vmax=vmax, edgecolor="none",
+           legend=True, legend_kwds={"label": "log₁₀(Predicted annual load + 1, aspect=None) [items y⁻¹]",
+                                      "shrink": 0.6, "pad": 0.02})
+
+# Top-10 by annual load
+top10_load = valid.nlargest(10, "annual_load").copy()
 top10_load["lon"] = top10_load.geometry.centroid.x
 top10_load["lat"] = top10_load.geometry.centroid.y
 
-MAIN38_OFFSETS = {
-    1:  ( 38,   6), 2:  (-55,  20), 3:  ( 40,  18), 4:  ( 40, -16),
-    5:  (-55,  28), 6:  (-55,   2), 7:  (-55, -28), 8:  ( 30,  26),
-    9:  ( 38,   0), 10: ( 38, -20),
-}
+for i, (_, row) in enumerate(top10_load.iterrows()):
+    sz = 220 - i*15
+    ax.scatter([row["lon"]], [row["lat"]], facecolor="none", edgecolor="#D7191C", s=sz, lw=2.0, zorder=5)
+    ax.text(row["lon"], row["lat"] + 1.2, str(i+1), color="#D7191C", ha="center", va="bottom",
+            fontsize=10, fontweight="bold", zorder=6)
 
-# --- Figure 3.8 main map ---
-fig, ax = plt.subplots(figsize=(8, 6))
-nodata.plot(ax=ax, color="#E0E0E0", edgecolor="none", aspect=None)
-valid.plot(ax=ax, column="log_load", cmap="YlOrRd",
-           vmin=VMIN_LOAD, vmax=VMAX_LOAD, edgecolor="none",
-           legend=True,
-           legend_kwds={"label": "log₁₀(Predicted annual load + 1) [items y⁻¹]",
-                        "shrink": 0.6, "pad": 0.02})
-for _, h in top10_load.iterrows():
-    r = int(h["rank"])
-    draw_rank_marker(ax, h["lon"], h["lat"], r, h["log_load"],
-                     VMIN_LOAD, VMAX_LOAD,
-                     offset_pt=MAIN38_OFFSETS[r],
-                     marker_size=max(110, 220 - (r - 1) * 10),
-                     font_size=10)
-ax.set_xlim(-180, 180); ax.set_ylim(-58, 82); ax.set_aspect("equal")
-ax.set_xlabel("Longitude (°)", fontsize=10)
-ax.set_ylabel("Latitude (°)", fontsize=10)
+ax.set_xlim(-180, 180); ax.set_ylim(-60, 80); ax.set_aspect("equal")
+ax.set_title("Predicted global annual microplastic load with top-10 hotspots",
+             fontweight="bold", pad=8)
 save(fig, "Figure_3_8.png", CH3_OUT)
-
-# --- Figure 3.8 zoom panels ---
-FIG38_ZOOMS = [
-    {"out": "Figure_3_8a.png",
-     "title": "(a) North America cluster (Mississippi system)",
-     "extent": (-96, -84, 34, 43), "ranks": [2, 5, 6, 7, 8, 10],
-     "label_offsets": {2: ( 38, -30), 5: (-55,  30), 6: (-55,  -2),
-                       7: (-55, -30), 8: ( 38,  30), 10: ( 55,  0)}},
-    {"out": "Figure_3_8b.png",
-     "title": "(b) East Asia cluster (Yangtze delta, Jiangsu)",
-     "extent": (115, 123, 29, 35), "ranks": [1, 3, 4],
-     "label_offsets": {1: ( 45,   0), 3: (-55,  28), 4: ( 45, -26)}},
-]
-for z in FIG38_ZOOMS:
-    lon_min, lon_max, lat_min, lat_max = z["extent"]
-    sub_v = valid.cx[lon_min:lon_max, lat_min:lat_max]
-    sub_n = nodata.cx[lon_min:lon_max, lat_min:lat_max]
-    fig, ax = plt.subplots(figsize=(8, 6))
-    if not sub_n.empty:
-        sub_n.plot(ax=ax, color="#E0E0E0", edgecolor="none", aspect=None)
-    sub_v.plot(ax=ax, column="log_load", cmap="YlOrRd",
-               vmin=VMIN_LOAD, vmax=VMAX_LOAD, edgecolor="none",
-               legend=True,
-               legend_kwds={"label": "log₁₀(Annual load + 1) [items y⁻¹]",
-                            "shrink": 0.7, "pad": 0.02})
-    for r in z["ranks"]:
-        h = top10_load[top10_load["rank"] == r].iloc[0]
-        draw_rank_marker(ax, h["lon"], h["lat"], r, h["log_load"],
-                         VMIN_LOAD, VMAX_LOAD,
-                         offset_pt=z["label_offsets"][r],
-                         marker_size=max(160, 320 - (r - 1) * 18),
-                         font_size=13)
-    ax.set_xlim(lon_min, lon_max); ax.set_ylim(lat_min, lat_max)
-    ax.set_aspect("equal")
-    ax.set_xlabel("Longitude (°)", fontsize=10)
-    ax.set_ylabel("Latitude (°)", fontsize=10)
-    ax.set_title(z["title"], fontweight="bold", pad=10)
-    save(fig, z["out"], CH3_OUT)
 
 
 # ============================================================
